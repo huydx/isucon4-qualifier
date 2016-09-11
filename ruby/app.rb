@@ -46,7 +46,10 @@ module Isucon4
          Time.now, user_id, login, request.ip, succeeded ? 1 : 0)
         keyip = "#{request.ip}:failures"
         keyuser = "#{user_id}:failures"
-        unless succeeded
+        if succeeded
+          redis.set keyip, 0
+          redis.set keyuser, 0
+        else
           redis.incr keyip
           redis.incr keyuser
         end
