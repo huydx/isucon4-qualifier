@@ -11,6 +11,23 @@ module Isucon4
     use Rack::Session::Cookie, secret: ENV['ISU4_SESSION_SECRET'] || 'shirokane'
     use Rack::Flash
     set :public_folder, File.expand_path('../../public', __FILE__)
+    set :environment, :development
+    set :logging,  Logger::DEBUG
+    set :dump_errors, true
+
+    error_logger = File.new('./app_error.log','a+')
+    error_logger.sync = true
+
+    configure do
+      enable :logging, :dump_errors
+      file = File.new('./app_log.log', 'a+')
+      file.sync = true
+      use Rack::CommonLogger, file
+    end
+
+    before {
+      env["rack.errors"] =  error_logger
+    }
 
     helpers do
       def config
@@ -192,5 +209,6 @@ module Isucon4
         locked_users: locked_users,
       }.to_json
     end
+    run! if app_file == $0
   end
 end

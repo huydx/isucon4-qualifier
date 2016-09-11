@@ -8,3 +8,9 @@ gem "unicorn"
 gem "foreman"
 gem "redis"
 gem "pry"
+group :development, :test do
+  gem 'awesome_print'
+  gem 'racksh'
+  gem 'pry'
+  gem 'pry-byebug'
+end
