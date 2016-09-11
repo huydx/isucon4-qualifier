@@ -4,6 +4,7 @@ require 'mysql2-cs-bind'
 require 'rack-flash'
 require 'json'
 require 'redis'
+require 'logger'
 require 'pry'
 
 module Isucon4
