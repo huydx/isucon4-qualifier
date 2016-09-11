@@ -24,6 +24,10 @@ module Isucon4
         @redis ||= Redis.new
       end
 
+      def cache
+        @cache ||= {}
+      end
+
       def db
         Thread.current[:isu4_db] ||= Mysql2::Client.new(
           host: ENV['ISU4_DB_HOST'] || 'localhost',
@@ -36,7 +40,14 @@ module Isucon4
       end
 
       def calculate_password_hash(password, salt)
-        Digest::SHA256.hexdigest "#{password}:#{salt}"
+        key = "#{password}:#{salt}"
+        if cache[key] == nil
+          digest = Digest::SHA256.hexdigest "#{password}:#{salt}"
+          cache[key] = digest
+          return digest
+        else
+          return cache[key]
+        end
       end
 
       def login_log(succeeded, login, user_id = nil)
