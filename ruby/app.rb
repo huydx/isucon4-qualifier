@@ -3,6 +3,8 @@ require 'digest/sha2'
 require 'mysql2-cs-bind'
 require 'rack-flash'
 require 'json'
+require 'redis'
+require 'pry'
 
 module Isucon4
   class App < Sinatra::Base
@@ -16,6 +18,10 @@ module Isucon4
           user_lock_threshold: (ENV['ISU4_USER_LOCK_THRESHOLD'] || 3).to_i,
           ip_ban_threshold: (ENV['ISU4_IP_BAN_THRESHOLD'] || 10).to_i,
         }
+      end
+
+      def redis
+        @redis ||= Redis.new
       end
 
       def db
@@ -37,20 +43,28 @@ module Isucon4
         db.xquery("INSERT INTO login_log" \
                   " (`created_at`, `user_id`, `login`, `ip`, `succeeded`)" \
                   " VALUES (?,?,?,?,?)",
-                 Time.now, user_id, login, request.ip, succeeded ? 1 : 0)
+         Time.now, user_id, login, request.ip, succeeded ? 1 : 0)
+        keyip = "#{request.ip}:failures"
+        keyuser = "#{user_id}:failures"
+        unless succeeded
+          redis.incr keyip
+          redis.incr keyuser
+        end
       end
 
       def user_locked?(user)
         return nil unless user
-        log = db.xquery("SELECT COUNT(1) AS failures FROM login_log WHERE user_id = ? AND id > IFNULL((select id from login_log where user_id = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0);", user['id'], user['id']).first
-
-        config[:user_lock_threshold] <= log['failures']
+        #log = db.xquery("SELECT COUNT(1) AS failures FROM login_log WHERE user_id = ? AND id > IFNULL((select id from login_log where user_id = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0);", user['id'], user['id']).first
+        count = redis.get("#{user['id']}:failures")
+        count = count.nil? ? 0 : count.to_i
+        config[:user_lock_threshold] <= count
       end
 
       def ip_banned?
-        log = db.xquery("SELECT COUNT(1) AS failures FROM login_log WHERE ip = ? AND id > IFNULL((select id from login_log where ip = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0);", request.ip, request.ip).first
-
-        config[:ip_ban_threshold] <= log['failures']
+        #log = db.xquery("SELECT COUNT(1) AS failures FROM login_log WHERE ip = ? AND id > IFNULL((select id from login_log where ip = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0);", request.ip, request.ip).first
+        count = redis.get("#{request.ip}:failures")
+        count = count.nil? ? 0 : count.to_i
+        config[:ip_ban_threshold] <= count
       end
 
       def attempt_login(login, password)
